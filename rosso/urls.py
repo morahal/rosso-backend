@@ -16,11 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from .views import list_items, get_item, get_user_purchases
+from .views import filtered_items, get_item, get_user_purchases, get_user
+from django.contrib.auth.views import LoginView, LogoutView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('items/', list_items, name='list-items'),
+    path('login/', LoginView.as_view(), name='login'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+    path('api/user/', get_user, name='get-user'),
+    path('items/', filtered_items, name='list-items'),
     path('item/<int:id>/', get_item, name='get-item'),
     path('users/<int:user_id>/purchases/', get_user_purchases, name='user-purchases'),
 ]

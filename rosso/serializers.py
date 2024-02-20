@@ -1,10 +1,12 @@
 from rest_framework import serializers
 from .models import Item, Purchase, PurchaseItem, Favorite
+from django.contrib.auth.models import User
 
-# class UserProfileSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = UserProfile
-#         fields = ['id', 'user', 'address', 'mobile_number']
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        # Exclude sensitive information like passwords
 
 class ItemSerializer(serializers.ModelSerializer):
     class Meta:

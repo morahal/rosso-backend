@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import UserProfile, Item, Purchase, PurchaseItem, Favorite
+from .models import Item, Purchase, PurchaseItem, Favorite
 
-class UserProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserProfile
-        fields = ['id', 'user', 'address', 'mobile_number']
+# class UserProfileSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = UserProfile
+#         fields = ['id', 'user', 'address', 'mobile_number']
 
 class ItemSerializer(serializers.ModelSerializer):
     class Meta:

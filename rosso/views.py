@@ -6,6 +6,10 @@ from django.utils import timezone
 from random import randint
 from rest_framework.response import Response
 from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.views import LoginView
+
 
 # @api_view(['GET', 'POST'])
 # def user_list(request):
@@ -31,6 +35,8 @@ def get_user(request):
     return Response(serializer.data)
 
 
+#################### ITEMS ####################
+
 @api_view(['GET'])
 def filtered_items(request):
     # Capture 'section' and 'category' from the query parameters
@@ -44,11 +50,18 @@ def filtered_items(request):
     if category:
         filters['category'] = category
 
-    # Query the database for items matching the filters
-    items = Item.objects.filter(**filters).distinct('name')
+    items = Item.objects.filter(**filters)
+
+    # Removing duplicates in Python
+    unique_items = []
+    unique_names = set()
+    for item in items:
+        if item.name not in unique_names:
+            unique_names.add(item.name)
+            unique_items.append(item)
 
     # Serialize and return the filtered items
-    serializer = ItemSerializer(items, many=True)
+    serializer = ItemSerializer(unique_items, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -61,6 +74,20 @@ def get_item(request, id):
     if request.method == 'GET':
         serializer = ItemSerializer(item)
         return Response(serializer.data)
+    
+
+@api_view(['GET'])
+def get_categories_by_section(request, section):
+    # Filter items by the provided section and get unique categories
+    categories = Item.objects.filter(section=section).values_list('category', flat=True).distinct()
+
+    # Convert the QuerySet to a list to make it JSON serializable
+    categories_list = list(categories)
+
+    return Response(categories_list)
+
+
+####################### PURCHASES ########################
 
 @api_view(['GET'])
 def get_user_purchases(request, user_id):
@@ -102,7 +129,42 @@ def create_purchase(request):
 
     serializer = PurchaseSerializer(purchase, context={'request': request})
     return Response(serializer.data)   
-    
 
 
+####################### FAVORITES ########################
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_favorites(request):
+    user = request.user
+    favorites = Favorite.objects.filter(user=user)
+    serializer = FavoriteSerializer(favorites, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_favorite(request):
+    user = request.user
+    item_id = request.data.get('item')
+    item = get_object_or_404(Item, id=item_id)
+
+    favorite, created = Favorite.objects.get_or_create(user=user, item=item)
+
+    if created:
+        serializer = FavoriteSerializer(favorite)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    else:
+        return Response({'detail': 'Item already in favorites'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_favorite(request, favorite_id):
+    user = request.user
+    try:
+        favorite = Favorite.objects.get(id=favorite_id, user=user)
+        favorite.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    except Favorite.DoesNotExist:
+        return Response({'detail': 'Favorite not found.'}, status=status.HTTP_404_NOT_FOUND)

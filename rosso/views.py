@@ -90,11 +90,19 @@ def get_categories_by_section(request, section):
 ####################### PURCHASES ########################
 
 @api_view(['GET'])
-def get_user_purchases(request, user_id):
-    if request.method == 'GET':
-        purchases = Purchase.objects.filter(customer_id = user_id)
-        serializer = PurchaseSerializer(purchases, many=True)
-        return Response(serializer.data)
+@permission_classes([IsAuthenticated])
+def get_user_purchases(request):
+    # Access the authenticated user from the request
+    user = request.user
+    
+    # Filter purchases by the authenticated user's ID
+    purchases = Purchase.objects.filter(customer=user)
+    
+    # Serialize the purchase data
+    serializer = PurchaseSerializer(purchases, many=True)
+    
+    # Return the serialized data in the response
+    return Response(serializer.data)
     
 
 @api_view(['POST'])
@@ -120,7 +128,7 @@ def create_purchase(request):
     # Create purchase items
     items = data.get('items')  # Assuming items is a list of item dictionaries with 'item_id' and 'quantity'
     for item_data in items:
-        item = Item.objects.get(id=item_data.get('item_id'))
+        item = Item.objects.get(id=item_data.get('id'))
         PurchaseItem.objects.create(
             purchase=purchase,
             item=item,

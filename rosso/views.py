@@ -141,13 +141,23 @@ def create_purchase(request):
 
 ####################### FAVORITES ########################
 
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def list_favorites(request):
+#     user = request.user
+#     favorites = Favorite.objects.filter(user=user)
+#     serializer = FavoriteSerializer(favorites, many=True)
+#     return Response(serializer.data)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_favorites(request):
     user = request.user
-    favorites = Favorite.objects.filter(user=user)
-    serializer = FavoriteSerializer(favorites, many=True)
+    # Fetch the favorited items directly
+    favorited_items = Item.objects.filter(favorite__user=user)
+    serializer = ItemSerializer(favorited_items, many=True)
     return Response(serializer.data)
+
 
 
 @api_view(['POST'])

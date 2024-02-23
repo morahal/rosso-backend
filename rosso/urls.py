@@ -16,6 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.conf.urls.static import static
+from rosso import settings
 from .views import filtered_items, get_item, get_user_purchases, get_user, create_purchase, list_favorites, add_favorite, remove_favorite, get_categories_by_section
 from django.contrib.auth.views import LogoutView, LoginView
 # from django.views.decorators.csrf import csrf_exempt
@@ -37,3 +39,5 @@ urlpatterns = [
     path('favorites/remove/<int:favorite_id>/', remove_favorite, name='remove-favorite'),
 ]
 
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

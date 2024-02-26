@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from django.conf.urls.static import static
 from rosso import settings
-from .views import filtered_items, get_item, get_user_purchases, get_user, create_purchase, list_favorites, add_favorite, remove_favorite, get_categories_by_section
+from .views import filtered_items, get_item, get_specific_item, get_user_purchases, get_user, create_purchase, list_favorites, add_favorite, remove_favorite, get_categories_by_section
 from django.contrib.auth.views import LogoutView, LoginView
 # from django.views.decorators.csrf import csrf_exempt
 
@@ -37,6 +37,7 @@ urlpatterns = [
     path('favorites/', list_favorites, name='list-favorites'),
     path('favorites/add/', add_favorite, name='add-favorite'),
     path('favorites/remove/<int:favorite_id>/', remove_favorite, name='remove-favorite'),
+    path('specificItem/', get_specific_item, name='get-specific-item'),
 ]
 
 if settings.DEBUG:

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from .serializers import  ItemSerializer, PurchaseSerializer, PurchaseItemSerializer, FavoriteSerializer, UserSerializer
 from .models import Item, Purchase, PurchaseItem, Favorite
 from rest_framework.decorators import api_view, permission_classes
@@ -9,6 +10,7 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.views import LoginView
+from django.db.models import Q
 
 
 # @api_view(['GET', 'POST'])
@@ -39,18 +41,30 @@ def get_user(request):
 
 @api_view(['GET'])
 def filtered_items(request):
-    # Capture 'section' and 'category' from the query parameters
     section = request.query_params.get('section')
     category = request.query_params.get('category')
+    size = request.query_params.get('size')
+    priceRange = request.query_params.get('priceRange')
+    color = request.query_params.get('color')
+    item_type = request.query_params.get('item_type')  
 
-    # Apply filters based on the presence of 'section' and 'category'
-    filters = {}
+    filters = Q()
     if section:
-        filters['section'] = section
+        filters &= Q(section=section)
     if category:
-        filters['category'] = category
-
-    items = Item.objects.filter(**filters)
+        filters &= Q(category=category)
+    if size:
+        filters &= Q(size=size)
+    if item_type:
+        filters &= Q(item_type=item_type)
+    if color:
+        filters &= Q(color=color)
+    if priceRange:
+        # Assuming priceRange is a string like '$10 - $20'
+        min_price, max_price = map(str, priceRange.replace('\'', '').replace('$', '').split(' - '))
+        filters &= Q(price__gte=min_price) & Q(price__lte=max_price)
+    
+    items = Item.objects.filter(filters).distinct()
 
     # Removing duplicates in Python
     unique_items = []
@@ -63,6 +77,11 @@ def filtered_items(request):
     # Serialize and return the filtered items
     serializer = ItemSerializer(unique_items, many=True)
     return Response(serializer.data)
+
+########################### ###########################################################
+    
+    
+
 
 @api_view(['GET'])
 def get_item(request, id):
@@ -186,3 +205,31 @@ def remove_favorite(request, favorite_id):
         return Response(status=status.HTTP_204_NO_CONTENT)
     except Favorite.DoesNotExist:
         return Response({'detail': 'Favorite not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+########## To return item when adding to cart ########
+@api_view(['GET'])
+def get_specific_item(request):
+    section = request.query_params.get('section')
+    category = request.query_params.get('category')
+    name = request.query_params.get('name')
+    size = request.query_params.get('size')
+    color = request.query_params.get('color')
+
+    #print("Received Params:", section, category, name, size, color)
+
+    items = Item.objects.filter(
+        section=section,
+        category=category,
+        name=name,
+        size=size,
+        color=color
+    )
+
+    #print("Filtered Items:", items)
+
+    if items.exists():
+        serializer = ItemSerializer(items.first())
+        return Response(serializer.data)
+    else:
+        return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)

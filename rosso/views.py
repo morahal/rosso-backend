@@ -1,5 +1,5 @@
 from decimal import Decimal
-from .serializers import  ItemSerializer, PurchaseSerializer, PurchaseItemSerializer, FavoriteSerializer, UserSerializer
+from .serializers import  ItemSerializer, PurchaseSerializer, PurchaseItemSerializer, FavoriteSerializer, UserSerializer, UserProfileSerializer
 from .models import Item, Purchase, PurchaseItem, Favorite
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -11,6 +11,82 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.views import LoginView
 from django.db.models import Q
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.models import User
+
+
+@api_view(['POST'])
+def login_view(request):
+    # Get the username and password from the request
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    # Authenticate the user
+    user = authenticate(request, username=username, password=password)
+
+    if user is not None:
+        # The credentials are valid
+        login(request, user)
+        # Return a successful response
+        return Response({"message": "You're logged in."})
+    else:
+        # The credentials are invalid
+        return Response({"message": "Invalid login details."})
+    
+    
+
+
+@api_view(['GET'])  # Or use POST if you prefer
+def check_username_exists(request, username):
+    """
+    Check if a username exists in the database.
+    """
+    if User.objects.filter(username=username).exists():
+        return Response({'message': 'Username exists'})
+    else:
+        return Response({'message': 'Username does not exist'})
+
+
+@api_view(['POST'])
+def create_user_and_profile(request):
+    user_serializer = UserSerializer(data=request.data)
+    
+    if user_serializer.is_valid():
+        user = user_serializer.save()
+        
+       # user.set_password(user.password)  # Hash password
+        raw_password = user_serializer.validated_data['password']
+        user.set_password(raw_password)  # Hash password before saving
+        
+        user.first_name = request.data.get('firstName', '')
+        user.last_name = request.data.get('lastName', '')  
+        user.save()
+        
+        # Now, create UserProfile
+        profile_data = {
+            'address': request.data.get('address'),
+            'phoneNb': request.data.get('phoneNb'),
+        }
+        profile_serializer = UserProfileSerializer(data=profile_data)
+        
+        if profile_serializer.is_valid():
+            profile = profile_serializer.save(user=user)
+            
+        # Authenticate user and log them in
+        user = authenticate(username=user.username, password=raw_password)
+        if user is not None:
+            login(request, user)  # This sets the user in the session
+            
+            
+            return Response({
+                'user': UserSerializer(user).data,
+                'userProfile': UserProfileSerializer(profile).data
+            }, status=status.HTTP_201_CREATED)
+            
+        else:
+            return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # @api_view(['GET', 'POST'])
@@ -107,7 +183,6 @@ def get_categories_by_section(request, section):
 
 
 ####################### PURCHASES ########################
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_purchases(request):
@@ -123,7 +198,6 @@ def get_user_purchases(request):
     # Return the serialized data in the response
     return Response(serializer.data)
     
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_purchase(request):
@@ -178,7 +252,6 @@ def list_favorites(request):
     return Response(serializer.data)
 
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def add_favorite(request):
@@ -207,7 +280,7 @@ def remove_favorite(request, favorite_id):
         return Response({'detail': 'Favorite not found.'}, status=status.HTTP_404_NOT_FOUND)
 
 
-########## To return item when adding to cart ########
+######################### To return item when adding to cart #################################
 @api_view(['GET'])
 def get_specific_item(request):
     section = request.query_params.get('section')

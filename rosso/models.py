@@ -18,6 +18,19 @@ from django.dispatch import receiver
 #         UserProfile.objects.create(user=instance)
 #     instance.userprofile.save()
 
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete= models.CASCADE)
+    address = models.CharField(max_length=255)
+    phoneNb = models.CharField(max_length=20)
+    # dateOfBirth = models.DateTimeField()
+    # firstName = models.CharField(max_length=255)
+    # lastName = models.CharField(max_length=255)
+    
+    def __str__(self):
+        return self.user.username
+
+
+
 # Items Model
 class Item(models.Model):
     section = models.CharField(max_length=100)

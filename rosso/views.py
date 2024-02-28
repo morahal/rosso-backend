@@ -13,6 +13,7 @@ from django.contrib.auth.views import LoginView
 from django.db.models import Q
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 @api_view(['POST'])
@@ -27,8 +28,12 @@ def login_view(request):
     if user is not None:
         # The credentials are valid
         login(request, user)
-        # Return a successful response
-        return Response({"message": "You're logged in."})
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            "message": "You're logged in."
+        })
     else:
         # The credentials are invalid
         return Response({"message": "Invalid login details."})
@@ -158,7 +163,6 @@ def filtered_items(request):
     
     
 
-
 @api_view(['GET'])
 def get_item(request, id):
     try:
@@ -212,7 +216,7 @@ def create_purchase(request):
     # Create the purchase
     purchase = Purchase.objects.create(
         customer=user,
-        total_price=data.get('total_price'),  # Assuming total_price is provided, or calculate from items
+        total_price=data.get('totalPrice'),  # Assuming total_price is provided, or calculate from items
         delivery_date_start=delivery_date_start,
         delivery_date_end=delivery_date_end,
         status='Processing'  # Example status

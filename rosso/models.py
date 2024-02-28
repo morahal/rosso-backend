@@ -67,7 +67,7 @@ class PurchaseItem(models.Model):
     quantity = models.IntegerField()
 
     def __str__(self):
-        return self.quantity
+        return str(self.quantity)
 
 # Favorites Model
 class Favorite(models.Model):

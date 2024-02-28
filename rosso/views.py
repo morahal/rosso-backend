@@ -226,11 +226,17 @@ def create_purchase(request):
     items = data.get('items')  # Assuming items is a list of item dictionaries with 'item_id' and 'quantity'
     for item_data in items:
         item = Item.objects.get(id=item_data.get('id'))
+        purchased_quantity = item_data.get('quantity')
+
         PurchaseItem.objects.create(
             purchase=purchase,
             item=item,
-            quantity=item_data.get('quantity')
+            quantity=purchased_quantity
         )
+
+         # Update the remaining quantity of the item
+        item.remaining_quantity -= purchased_quantity
+        item.save()  # Don't forget to save the item after updating
 
     serializer = PurchaseSerializer(purchase, context={'request': request})
     return Response(serializer.data)   

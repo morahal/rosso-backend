@@ -231,8 +231,11 @@ def get_categories_by_section(request, section):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_purchases(request):
+    print('get user purchase')
     user = request.user
+    print(user.username)
     purchases = Purchase.objects.filter(customer=user)
+    print(purchases)
     serializer = PurchaseSerializer(purchases, many=True)
     return Response(serializer.data)
     

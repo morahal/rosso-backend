@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from django.conf.urls.static import static
 from rosso import settings
-from .views import filtered_items, get_item, get_specific_item, get_user_purchases, get_user, create_purchase, list_favorites, add_favorite, remove_favorite, get_categories_by_section, create_user_and_profile, check_username_exists, login_view
+from .views import filtered_items, get_item, get_specific_item, get_user_purchases, get_user, create_purchase, list_favorites, add_favorite, remove_favorite, get_categories_by_section, create_user_and_profile, check_username_exists, login_view,logout_view, get_purchase_items
 from django.contrib.auth.views import LogoutView, LoginView
 
 # from django.views.decorators.csrf import csrf_exempt
@@ -32,8 +32,9 @@ urlpatterns = [
     path('user/info/', get_user, name='get-user'),
     path('items/', filtered_items, name='list-items'),
     path('item/<int:id>/', get_item, name='get-item'),
+    path('purchases/<int:purchase_id>/items/', get_purchase_items, name='get-purchase-items'),
     path('categories/<section>/', get_categories_by_section, name='categories-by-section'),
-    path('users/<int:user_id>/purchases/', get_user_purchases, name='user-purchases'),
+    path('users/purchases/', get_user_purchases, name='user-purchases'),
     path('purchase/create/', create_purchase, name='create-purchase'),
     path('favorites/', list_favorites, name='list-favorites'),
     path('favorites/add/', add_favorite, name='add-favorite'),
@@ -42,7 +43,8 @@ urlpatterns = [
     path('createUser/', create_user_and_profile, name='create-user'),
     path('checkUsername/<str:username>/', check_username_exists, name='check-username'),
     path('login/', login_view, name='login'),
-  
+    path('logout/', logout_view, name='logout'),
+
 ]
 
 if settings.DEBUG:

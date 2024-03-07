@@ -1,5 +1,5 @@
 from decimal import Decimal
-from .serializers import  ItemSerializer, PurchaseSerializer, PurchaseItemSerializer, FavoriteSerializer, UserSerializer, UserProfileSerializer
+from .serializers import  ItemSerializer, PurchaseSerializer, PurchaseItemSerializer, FavoriteSerializer, UserSerializer, UserProfileSerializer,UserProfile
 from .models import Item, Purchase, PurchaseItem, Favorite
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -14,6 +14,8 @@ from django.db.models import Q
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import logout
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 
 
 @api_view(['POST'])
@@ -38,7 +40,21 @@ def login_view(request):
         # The credentials are invalid
         return Response({"message": "Invalid login details."})
     
-    
+
+@api_view(['POST'])
+def logout_view(request):
+    try:
+        # Blacklist the user's token
+        token = RefreshToken(request.data.get('refresh'))
+        token.blacklist()
+
+        # Django logout
+        logout(request)
+
+        return Response({"message": "You've been logged out."})
+    except Exception as e:
+        return Response({"message": "There was an error during logout: {}".format(str(e))})
+
 
 
 @api_view(['GET'])  # Or use POST if you prefer
@@ -58,37 +74,38 @@ def create_user_and_profile(request):
     
     if user_serializer.is_valid():
         user = user_serializer.save()
-        
-       # user.set_password(user.password)  # Hash password
-        raw_password = user_serializer.validated_data['password']
-        user.set_password(raw_password)  # Hash password before saving
-        
+        user.set_password(user_serializer.validated_data['password'])  # Hash password before saving
         user.first_name = request.data.get('firstName', '')
         user.last_name = request.data.get('lastName', '')  
         user.save()
         
-        # Now, create UserProfile
         profile_data = {
+            'user': user.id,
             'address': request.data.get('address'),
             'phoneNb': request.data.get('phoneNb'),
         }
         profile_serializer = UserProfileSerializer(data=profile_data)
         
         if profile_serializer.is_valid():
-            profile = profile_serializer.save(user=user)
+            profile = profile_serializer.save()
             
-        # Authenticate user and log them in
-        user = authenticate(username=user.username, password=raw_password)
-        if user is not None:
-            login(request, user)  # This sets the user in the session
-            
-            
-            return Response({
-                'user': UserSerializer(user).data,
-                'userProfile': UserProfileSerializer(profile).data
-            }, status=status.HTTP_201_CREATED)
-            
+            # Authenticate and login the user
+            login_user = authenticate(username=user.username, password=request.data.get('password'))
+            if login_user:
+                login(request, login_user)  # This sets the user in the session
+                refresh = RefreshToken.for_user(user)
+                
+                return Response({
+                    'user': UserSerializer(user).data,
+                    'userProfile': UserProfileSerializer(profile).data,
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                    "message": "You're successfully signed up and logged in."
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response({"message": "User authentication failed after sign-up."}, status=status.HTTP_400_BAD_REQUEST)
         else:
+            user.delete()  # Optionally delete the user if profile creation fails
             return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     else:
         return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -112,9 +129,12 @@ def create_user_and_profile(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user(request):
-    # The request.user property will contain the user instance associated with the provided token
-    user = request.user
-    serializer = UserSerializer(user)
+   # Fetch the UserProfile instance associated with the request user
+    user_profile, created = UserProfile.objects.get_or_create(user=request.user)
+
+    # Serialize the user profile
+    serializer = UserProfileSerializer(user_profile)
+
     return Response(serializer.data)
 
 
@@ -175,6 +195,27 @@ def get_item(request, id):
         return Response(serializer.data)
     
 
+
+@api_view(['GET'])
+def get_purchase_items(request, purchase_id):
+    try:
+        # Ensure the purchase exists
+        purchase = get_object_or_404(Purchase, id=purchase_id)
+        
+        # Fetch all PurchaseItem instances related to the purchase
+        purchase_items = PurchaseItem.objects.filter(purchase=purchase)
+        
+        # Extract the items from purchase_items
+        items = [purchase_item.item for purchase_item in purchase_items]
+        
+        # Serialize the item details
+        serializer = ItemSerializer(items, many=True)
+        
+        return Response(serializer.data)
+    except Purchase.DoesNotExist:
+        return Response({'message': 'Purchase not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+
 @api_view(['GET'])
 def get_categories_by_section(request, section):
     # Filter items by the provided section and get unique categories
@@ -190,16 +231,9 @@ def get_categories_by_section(request, section):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_purchases(request):
-    # Access the authenticated user from the request
     user = request.user
-    
-    # Filter purchases by the authenticated user's ID
     purchases = Purchase.objects.filter(customer=user)
-    
-    # Serialize the purchase data
     serializer = PurchaseSerializer(purchases, many=True)
-    
-    # Return the serialized data in the response
     return Response(serializer.data)
     
 @api_view(['POST'])

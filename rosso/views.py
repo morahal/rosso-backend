@@ -286,6 +286,8 @@ def create_purchase(request):
 #     serializer = FavoriteSerializer(favorites, many=True)
 #     return Response(serializer.data)
 
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_favorites(request):
@@ -301,8 +303,8 @@ def list_favorites(request):
 def add_favorite(request):
     user = request.user
     item_id = request.data.get('item')
+    
     item = get_object_or_404(Item, id=item_id)
-
     favorite, created = Favorite.objects.get_or_create(user=user, item=item)
 
     if created:
@@ -312,16 +314,19 @@ def add_favorite(request):
         return Response({'detail': 'Item already in favorites'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['DELETE'])
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def remove_favorite(request, favorite_id):
+def remove_favorite(request):
     user = request.user
+    item_id = request.data.get('item')
+    
+    item = get_object_or_404(Item, id=item_id)
     try:
-        favorite = Favorite.objects.get(id=favorite_id, user=user)
+        favorite = Favorite.objects.get(user=user, item=item)
         favorite.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'detail': 'Favorite successfully removed.'}, status=status.HTTP_204_NO_CONTENT)
     except Favorite.DoesNotExist:
-        return Response({'detail': 'Favorite not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'detail': 'Item not found in favorites.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 ######################### To return item when adding to cart #################################
@@ -350,3 +355,59 @@ def get_specific_item(request):
         return Response(serializer.data)
     else:
         return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+######################### For the ML model #################################
+
+import pandas as pd
+import joblib
+from django.conf import settings
+import os
+
+@api_view(['POST'])
+def predict_size(request):
+    
+    print("Current working directory:", os.getcwd())
+    #user = request.user  # Example usage of user, adapt according to your needs
+    
+    # Assuming 'weight', 'age', 'height' are passed directly in the request data
+    weight = request.data.get('weight')
+    age = request.data.get('age')
+    height = request.data.get('height')
+    
+    
+  
+    
+    # Load pre-trained models and preprocessing tools
+    #random_forest_tuned = joblib.load('./model_files/random_forest_tuned.joblib')
+    
+    random_forest_tuned = joblib.load(os.path.join(settings.BASE_DIR, 'rosso/model_files/random_forest_tuned.joblib'))
+    
+    #print("hello, world!")
+    #gradient_boosting = joblib.load('path/to/gradient_boosting.joblib')
+    imputer = joblib.load(os.path.join(settings.BASE_DIR, 'rosso/model_files/imputer.joblib'))
+    size_encoder = joblib.load(os.path.join(settings.BASE_DIR, 'rosso/model_files/size_encoder.joblib'))
+    scaler = joblib.load(os.path.join(settings.BASE_DIR, 'rosso/model_files/scaler.joblib'))
+    
+    if not all([weight, age, height]):
+        return Response({'error': 'Missing data for weight, age, or height'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Preprocess the input data
+    input_data = pd.DataFrame([[weight, age, height]], columns=['weight', 'age', 'height'])
+    input_data[['age', 'height']] = imputer.transform(input_data[['age', 'height']])
+    input_scaled = scaler.transform(input_data)
+    
+    # Predict and encode responses
+    predicted_rf = random_forest_tuned.predict(input_scaled)
+   # predicted_gb = gradient_boosting.predict(input_scaled)
+    predicted_size_rf = size_encoder.inverse_transform(predicted_rf.reshape(-1, 1))[0][0]
+    #predicted_size_gb = size_encoder.inverse_transform(predicted_gb.reshape(-1, 1))[0][0]
+    
+    # Return the prediction results
+    response_data = {
+        'Random Forest Tuned Size': predicted_size_rf,
+        #'Gradient Boosting Size': predicted_size_gb
+    }
+    
+    return Response(response_data, status=status.HTTP_200_OK)

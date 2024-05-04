@@ -8,17 +8,25 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['username', 'password', 'email', 'first_name', 'last_name']
         # Exclude sensitive information like passwords
         
-class UserProfileSerializer(serializers.ModelSerializer):
+# class UserProfileSerializer(serializers.ModelSerializer):
 
-    user = serializers.SerializerMethodField()
+#     user = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = UserProfile
+#         fields = ['user','address', 'phoneNb']
+
+#     def get_user(self, obj):
+#         user = obj.user
+#         return UserSerializer(user).data
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
 
     class Meta:
         model = UserProfile
-        fields = ['user','address', 'phoneNb']
-
-    def get_user(self, obj):
-        user = obj.user
-        return UserSerializer(user).data
+        fields = ('user', 'address', 'phoneNb')
 
 class ItemSerializer(serializers.ModelSerializer):
     class Meta:

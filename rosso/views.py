@@ -7,6 +7,7 @@ from django.utils import timezone
 from random import randint
 from rest_framework.response import Response
 from rest_framework import status
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.views import LoginView
@@ -68,48 +69,91 @@ def check_username_exists(request, username):
         return Response({'message': 'Username does not exist'})
 
 
+# @api_view(['POST'])
+# def create_user_and_profile(request):
+#     user_serializer = UserSerializer(data=request.data)
+    
+#     if user_serializer.is_valid():
+#         user = user_serializer.save()
+#         user.set_password(user_serializer.validated_data['password'])  # Hash password before saving
+#         user.first_name = request.data.get('firstName', '')
+#         user.last_name = request.data.get('lastName', '')  
+#         user.save()
+        
+#         profile_data = {
+#             'user': user.id,
+#             'address': request.data.get('address'),
+#             'phoneNb': request.data.get('phoneNb'),
+#         }
+#         profile_serializer = UserProfileSerializer(data=profile_data)
+        
+#         if profile_serializer.is_valid():
+#             profile = profile_serializer.save()
+            
+#             # Authenticate and login the user
+#             login_user = authenticate(username=user.username, password=request.data.get('password'))
+#             if login_user:
+#                 login(request, login_user)  # This sets the user in the session
+#                 refresh = RefreshToken.for_user(user)
+                
+#                 return Response({
+#                     'user': UserSerializer(user).data,
+#                     'userProfile': UserProfileSerializer(profile).data,
+#                     'refresh': str(refresh),
+#                     'access': str(refresh.access_token),
+#                     "message": "You're successfully signed up and logged in."
+#                 }, status=status.HTTP_201_CREATED)
+#             else:
+#                 return Response({"message": "User authentication failed after sign-up."}, status=status.HTTP_400_BAD_REQUEST)
+#         else:
+#             user.delete()  # Optionally delete the user if profile creation fails
+#             return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#     else:
+#         return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 @api_view(['POST'])
 def create_user_and_profile(request):
     user_serializer = UserSerializer(data=request.data)
-    
     if user_serializer.is_valid():
-        user = user_serializer.save()
-        user.set_password(user_serializer.validated_data['password'])  # Hash password before saving
-        user.first_name = request.data.get('firstName', '')
-        user.last_name = request.data.get('lastName', '')  
-        user.save()
-        
-        profile_data = {
-            'user': user.id,
-            'address': request.data.get('address'),
-            'phoneNb': request.data.get('phoneNb'),
-        }
-        profile_serializer = UserProfileSerializer(data=profile_data)
-        
-        if profile_serializer.is_valid():
-            profile = profile_serializer.save()
-            
-            # Authenticate and login the user
-            login_user = authenticate(username=user.username, password=request.data.get('password'))
-            if login_user:
-                login(request, login_user)  # This sets the user in the session
-                refresh = RefreshToken.for_user(user)
-                
-                return Response({
-                    'user': UserSerializer(user).data,
-                    'userProfile': UserProfileSerializer(profile).data,
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                    "message": "You're successfully signed up and logged in."
-                }, status=status.HTTP_201_CREATED)
+        with transaction.atomic():
+            user = user_serializer.save()
+            user.set_password(user_serializer.validated_data['password'])
+            user.first_name = request.data.get('firstName', '')
+            user.last_name = request.data.get('lastName', '')
+            user.save()
+
+            if user.id is None:
+                return Response({"message": "User creation failed."}, status=status.HTTP_400_BAD_REQUEST)
+
+            profile_data = {
+                'user': user.id,
+                'address': request.data.get('address'),
+                'phoneNb': request.data.get('phoneNb'),
+            }
+            profile_serializer = UserProfileSerializer(data=profile_data)
+
+            if profile_serializer.is_valid():
+                profile = profile_serializer.save()
+                login_user = authenticate(username=user.username, password=request.data.get('password'))
+                if login_user:
+                    login(request, login_user)
+                    refresh = RefreshToken.for_user(user)
+                    
+                    return Response({
+                        'user': UserSerializer(user).data,
+                        'userProfile': UserProfileSerializer(profile).data,
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token),
+                        "message": "You're successfully signed up and logged in."
+                    }, status=status.HTTP_201_CREATED)
+                else:
+                    return Response({"message": "User authentication failed after sign-up."}, status=status.HTTP_400_BAD_REQUEST)
             else:
-                return Response({"message": "User authentication failed after sign-up."}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            user.delete()  # Optionally delete the user if profile creation fails
-            return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                user.delete()  # Optionally delete the user if profile creation fails
+                return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     else:
         return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 # @api_view(['GET', 'POST'])
 # def user_list(request):
@@ -378,9 +422,6 @@ def predict_size(request):
     weight = request.data.get('weight')
     age = request.data.get('age')
     height = request.data.get('height')
-    
-    
-  
     
     # Load pre-trained models and preprocessing tools
     #random_forest_tuned = joblib.load('./model_files/random_forest_tuned.joblib')

@@ -21,12 +21,21 @@ class UserSerializer(serializers.ModelSerializer):
 #         return UserSerializer(user).data
 
 
-class UserProfileSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+# class UserProfileSerializer(serializers.ModelSerializer):
+#     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
 
+#     class Meta:
+#         model = UserProfile
+#         fields = ('user', 'address', 'phoneNb')
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email')
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    
     class Meta:
         model = UserProfile
-        fields = ('user', 'address', 'phoneNb')
+        fields = ('email', 'first_name', 'last_name', 'address', 'phoneNb')
 
 class ItemSerializer(serializers.ModelSerializer):
     class Meta:

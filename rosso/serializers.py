@@ -29,13 +29,14 @@ class UserSerializer(serializers.ModelSerializer):
 #         fields = ('user', 'address', 'phoneNb')
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(source='user.email')
-    first_name = serializers.CharField(source='user.first_name')
-    last_name = serializers.CharField(source='user.last_name')
-    
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+
     class Meta:
         model = UserProfile
-        fields = ('email', 'first_name', 'last_name', 'address', 'phoneNb')
+        fields = ('user', 'email', 'first_name', 'last_name', 'address', 'phoneNb')
 
 class ItemSerializer(serializers.ModelSerializer):
     class Meta:
